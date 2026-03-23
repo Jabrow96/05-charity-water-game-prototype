@@ -11,8 +11,10 @@
     <div id="startScreen" class="screen active">
         <div class="start-container">
             <h1>WE NEED WATER!</h1>
-            <p class="brand-text">Brought to you by Charity: Water</p>
-            <div class="logo-placeholder">💧 Charity: Water Logo 💧</div>
+            <p class="brand-text">Brought to you by</p>
+            <div class="logo-placeholder">
+                <img src="img/cw_logo_horizontal.png" alt="Charity: Water Logo" class="charity-logo">
+            </div>
             
             <!-- Animated background with falling drops -->
             <div class="drop-preview-container">
@@ -59,6 +61,8 @@
                 <div id="gameDrops" class="drops-container"></div>
             </div>
 
+            <div id="speedPopup" class="speed-popup">Very Good! The drops get faster!</div>
+
             <!-- HUD: Top-right info -->
             <div class="hud">
                 <div class="hud-item">
@@ -79,13 +83,8 @@
                 </svg>
             </div>
 
-            <!-- Bucket (placeholder with CSS shape) -->
-            <div id="bucket" class="bucket">
-                <div class="bucket-arrow bucket-arrow-left">◀</div>
-                <div class="bucket-body"></div>
-                <div class="bucket-handle"></div>
-                <div class="bucket-arrow bucket-arrow-right">▶</div>
-            </div>
+            <!-- Water Can -->
+            <img id="bucket" class="bucket" src="img/water-can-transparent.png" alt="Water Can" />
         </div>
     </div>
 

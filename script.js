@@ -6,10 +6,22 @@ const gameState = {
     lives: 3,
     maxLives: 3,
     drops: [],
-    bucket: { x: window.innerWidth / 2 - 40, width: 80 },
+    bucket: {
+        x: window.innerWidth / 2 - 50,
+        y: window.innerHeight - 120,
+        width: 100,
+        height: 100,
+    },
     gameLoopId: null,
     dropSpawnId: null,
     bucketSpeed: 8,
+    minDropSpacing: 55,
+    spawnCheckHeight: 220,
+    baseSpawnInterval: 800,
+    minSpawnInterval: 220,
+    speedRampFactor: 1.18,
+    speedLevel: 0,
+    speedMultiplier: 1,
 };
 
 // DOM Elements
@@ -24,6 +36,7 @@ const screens = {
 const gameElements = {
     bucket: document.getElementById('bucket'),
     gameDrops: document.getElementById('gameDrops'),
+    speedPopup: document.getElementById('speedPopup'),
     dropCounter: document.getElementById('dropCounter'),
     streakText: document.getElementById('streakText'),
     heartSvg: document.getElementById('heartSvg'),
@@ -31,6 +44,8 @@ const gameElements = {
     finalScore: document.getElementById('finalScore'),
     previewDrops: document.getElementById('previewDrops'),
 };
+
+let speedPopupTimeoutId = null;
 
 // ============ SCREEN MANAGEMENT ============
 
@@ -47,7 +62,15 @@ function switchScreen(screenName) {
 function createDrop() {
     const dropType = Math.random() > 0.7 ? 'bad' : 'good'; // 30% bad, 70% good
     const x = Math.random() * (window.innerWidth - 30);
-    const speed = 2 + Math.random() * 2; // Random speed between 2-4
+    let speed = 2 + Math.random() * 2; // Default speed range: 2-4
+
+    // Add stronger speed variety using slow, normal, and fast tiers.
+    const speedRoll = Math.random();
+    if (speedRoll < 0.25) {
+        speed = 0.9 + Math.random() * 1.1; // Slow: 0.9-2.0
+    } else if (speedRoll > 0.75) {
+        speed = 5 + Math.random() * 3.2; // Fast: 5.0-8.2
+    }
     
     return {
         x,
@@ -58,6 +81,38 @@ function createDrop() {
         speed,
         element: null,
     };
+}
+
+function getSpacedSpawnX() {
+    const maxX = window.innerWidth - 30;
+    let bestX = Math.random() * maxX;
+    let bestDistance = -1;
+
+    // Only compare against drops near the top where new drops enter the screen.
+    const nearbyDrops = gameState.drops.filter((drop) => drop.y < gameState.spawnCheckHeight);
+
+    // Try multiple positions and keep the first one that meets spacing rules.
+    for (let attempt = 0; attempt < 12; attempt++) {
+        const candidateX = Math.random() * maxX;
+        let closestDistance = Infinity;
+
+        for (const existingDrop of nearbyDrops) {
+            const distance = Math.abs(existingDrop.x - candidateX);
+            closestDistance = Math.min(closestDistance, distance);
+        }
+
+        if (nearbyDrops.length === 0 || closestDistance >= gameState.minDropSpacing) {
+            return candidateX;
+        }
+
+        if (closestDistance > bestDistance) {
+            bestDistance = closestDistance;
+            bestX = candidateX;
+        }
+    }
+
+    // Fallback: if the screen is crowded, use the best available position.
+    return bestX;
 }
 
 function spawnDropPreviewDrops() {
@@ -89,6 +144,7 @@ function spawnDropPreviewDrops() {
 function spawnGameDrops() {
     // Main game drop spawning
     const drop = createDrop();
+    drop.x = getSpacedSpawnX();
     const dropEl = document.createElement('div');
     dropEl.className = `drop ${drop.type}`;
     dropEl.style.left = drop.x + 'px';
@@ -118,12 +174,23 @@ gameElements.bucket.addEventListener('pointerdown', (e) => {
 
     isDraggingBucket = true;
     gameElements.bucket.setPointerCapture(e.pointerId);
-    updateBucketPosition(e.clientX);
+    updateBucketPositionXY(
+        e.clientX - gameState.bucket.width / 2,
+        e.clientY - gameState.bucket.height / 2
+    );
+});
+
+// Prevent native image drag behavior
+gameElements.bucket.addEventListener('dragstart', (e) => {
+    e.preventDefault();
 });
 
 document.addEventListener('pointermove', (e) => {
     if (gameState.phase !== 'game' || !isDraggingBucket) return;
-    updateBucketPosition(e.clientX);
+    updateBucketPositionXY(
+        e.clientX - gameState.bucket.width / 2,
+        e.clientY - gameState.bucket.height / 2
+    );
 });
 
 document.addEventListener('pointerup', () => {
@@ -134,17 +201,40 @@ document.addEventListener('pointercancel', () => {
     isDraggingBucket = false;
 });
 
-function updateBucketPosition(x) {
-    // Keep bucket within screen bounds
-    gameState.bucket.x = Math.max(10, Math.min(x - gameState.bucket.width / 2, window.innerWidth - gameState.bucket.width - 10));
+function updateBucketPositionXY(x, y) {
+    const minX = 10;
+    const maxX = window.innerWidth - gameState.bucket.width - 10;
+    const minY = 80;
+    const maxY = window.innerHeight - gameState.bucket.height - 20;
+
+    gameState.bucket.x = Math.max(minX, Math.min(x, maxX));
+    gameState.bucket.y = Math.max(minY, Math.min(y, maxY));
+
     gameElements.bucket.style.left = gameState.bucket.x + 'px';
+    gameElements.bucket.style.top = gameState.bucket.y + 'px';
+}
+
+function moveBucketWithKeyboard() {
+    if (gameState.phase !== 'game') return;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (keyStates['ArrowLeft'] || keyStates['a'] || keyStates['A']) dx -= gameState.bucketSpeed;
+    if (keyStates['ArrowRight'] || keyStates['d'] || keyStates['D']) dx += gameState.bucketSpeed;
+    if (keyStates['ArrowUp'] || keyStates['w'] || keyStates['W']) dy -= gameState.bucketSpeed;
+    if (keyStates['ArrowDown'] || keyStates['s'] || keyStates['S']) dy += gameState.bucketSpeed;
+
+    if (dx !== 0 || dy !== 0) {
+        updateBucketPositionXY(gameState.bucket.x + dx, gameState.bucket.y + dy);
+    }
 }
 
 // ============ COLLISION DETECTION ============
 
 function getBucketBounds() {
-    const bottom = window.innerHeight - 100; // approximate bucket position
-    const top = bottom - 50;
+    const top = gameState.bucket.y;
+    const bottom = top + gameState.bucket.height;
     const left = gameState.bucket.x;
     const right = left + gameState.bucket.width;
 
@@ -171,10 +261,12 @@ function checkCollision(drop) {
 // ============ GAME LOOP ============
 
 function gameLoop() {
+    moveBucketWithKeyboard();
+
     // Update drops
     for (let i = gameState.drops.length - 1; i >= 0; i--) {
         const drop = gameState.drops[i];
-        drop.y += drop.speed;
+        drop.y += drop.speed * gameState.speedMultiplier;
 
         // Update visual position
         if (drop.element) {
@@ -186,7 +278,43 @@ function gameLoop() {
             if (drop.type === 'good') {
                 gameState.score++;
                 gameState.streak++;
+                updateGameSpeed();
                 updateHUD();
+function updateGameSpeed() {
+    const newSpeedLevel = Math.floor(gameState.score / 25);
+
+    if (newSpeedLevel === gameState.speedLevel) {
+        return;
+    }
+
+    gameState.speedLevel = newSpeedLevel;
+    gameState.speedMultiplier = Math.pow(gameState.speedRampFactor, gameState.speedLevel);
+
+    if (gameState.speedLevel > 0) {
+        showSpeedPopup();
+    }
+
+    // Rebuild spawn loop so drops also spawn faster as speed levels increase.
+    const nextSpawnInterval = Math.max(
+        gameState.minSpawnInterval,
+        Math.round(gameState.baseSpawnInterval / gameState.speedMultiplier)
+    );
+
+    clearInterval(gameState.dropSpawnId);
+    gameState.dropSpawnId = setInterval(spawnGameDrops, nextSpawnInterval);
+}
+
+function showSpeedPopup() {
+    if (!gameElements.speedPopup) return;
+
+    gameElements.speedPopup.textContent = 'Very Good! The drops get faster!';
+    gameElements.speedPopup.classList.add('show');
+
+    clearTimeout(speedPopupTimeoutId);
+    speedPopupTimeoutId = setTimeout(() => {
+        gameElements.speedPopup.classList.remove('show');
+    }, 1500);
+}
 
                 // Check if streak hits milestone for healing
                 if (gameState.streak > 0 && gameState.streak % 10 === 0) {
@@ -296,11 +424,18 @@ function startGame() {
     gameState.drops = [];
     gameElements.gameDrops.innerHTML = '';
     gameState.bucket.x = window.innerWidth / 2 - gameState.bucket.width / 2;
+    gameState.bucket.y = window.innerHeight - gameState.bucket.height - 20;
+    gameState.speedLevel = 0;
+    gameState.speedMultiplier = 1;
+    if (gameElements.speedPopup) {
+        gameElements.speedPopup.classList.remove('show');
+    }
     gameElements.bucket.style.left = gameState.bucket.x + 'px';
+    gameElements.bucket.style.top = gameState.bucket.y + 'px';
     updateHUD();
 
     // Start spawn loop
-    gameState.dropSpawnId = setInterval(spawnGameDrops, 800);
+    gameState.dropSpawnId = setInterval(spawnGameDrops, gameState.baseSpawnInterval);
 
     // Start game loop
     gameState.gameLoopId = setInterval(gameLoop, 30);
@@ -339,12 +474,12 @@ function spawnPreviewDropsLoop() {
 window.addEventListener('DOMContentLoaded', () => {
     switchScreen('start');
     gameElements.bucket.style.left = gameState.bucket.x + 'px';
+    gameElements.bucket.style.top = gameState.bucket.y + 'px';
     spawnPreviewDropsLoop();
     updateHUD();
 });
 
 // Handle window resize
 window.addEventListener('resize', () => {
-    gameState.bucket.x = Math.min(gameState.bucket.x, window.innerWidth - gameState.bucket.width);
-    gameElements.bucket.style.left = gameState.bucket.x + 'px';
+    updateBucketPositionXY(gameState.bucket.x, gameState.bucket.y);
 });

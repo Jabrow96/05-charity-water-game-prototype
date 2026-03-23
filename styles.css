@@ -263,6 +263,31 @@ body {
     height: 100%;
 }
 
+.speed-popup {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.94);
+    z-index: 160;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border: 2px solid #FFC907;
+    border-radius: 14px;
+    padding: 16px 22px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+    max-width: min(90vw, 420px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.speed-popup.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
 /* HUD (Heads-Up Display) */
 .hud {
     position: absolute;
@@ -304,12 +329,15 @@ body {
 /* Bucket */
 .bucket {
     position: absolute;
-    bottom: 20px;
+    top: calc(100% - 120px);
     left: 50%;
     z-index: 50;
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     touch-action: none;
+    object-fit: contain;
+    -webkit-user-drag: none;
+    cursor: grab;
 }
 
 .bucket-arrow {
