@@ -6,7 +6,7 @@ const gameState = {
     lives: 3,
     maxLives: 3,
     drops: [],
-    bucket: { x: window.innerWidth / 2, width: 80 },
+    bucket: { x: window.innerWidth / 2 - 40, width: 80 },
     gameLoopId: null,
     dropSpawnId: null,
     bucketSpeed: 8,
@@ -102,6 +102,7 @@ function spawnGameDrops() {
 // ============ BUCKET CONTROL ============
 
 let keyStates = {};
+let isDraggingBucket = false;
 
 document.addEventListener('keydown', (e) => {
     keyStates[e.key] = true;
@@ -111,23 +112,26 @@ document.addEventListener('keyup', (e) => {
     keyStates[e.key] = false;
 });
 
-// Mouse/Touch tracking
-let mouseX = window.innerWidth / 2;
+// Press-and-drag bucket movement
+gameElements.bucket.addEventListener('pointerdown', (e) => {
+    if (gameState.phase !== 'game') return;
 
-document.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    if (gameState.phase === 'playing') {
-        updateBucketPosition(mouseX);
-    }
+    isDraggingBucket = true;
+    gameElements.bucket.setPointerCapture(e.pointerId);
+    updateBucketPosition(e.clientX);
 });
 
-document.addEventListener('touchmove', (e) => {
-    if (e.touches[0]) {
-        mouseX = e.touches[0].clientX;
-        if (gameState.phase === 'playing') {
-            updateBucketPosition(mouseX);
-        }
-    }
+document.addEventListener('pointermove', (e) => {
+    if (gameState.phase !== 'game' || !isDraggingBucket) return;
+    updateBucketPosition(e.clientX);
+});
+
+document.addEventListener('pointerup', () => {
+    isDraggingBucket = false;
+});
+
+document.addEventListener('pointercancel', () => {
+    isDraggingBucket = false;
 });
 
 function updateBucketPosition(x) {
@@ -291,6 +295,8 @@ function startGame() {
     gameState.lives = gameState.maxLives;
     gameState.drops = [];
     gameElements.gameDrops.innerHTML = '';
+    gameState.bucket.x = window.innerWidth / 2 - gameState.bucket.width / 2;
+    gameElements.bucket.style.left = gameState.bucket.x + 'px';
     updateHUD();
 
     // Start spawn loop
@@ -332,6 +338,7 @@ function spawnPreviewDropsLoop() {
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
     switchScreen('start');
+    gameElements.bucket.style.left = gameState.bucket.x + 'px';
     spawnPreviewDropsLoop();
     updateHUD();
 });
@@ -339,4 +346,5 @@ window.addEventListener('DOMContentLoaded', () => {
 // Handle window resize
 window.addEventListener('resize', () => {
     gameState.bucket.x = Math.min(gameState.bucket.x, window.innerWidth - gameState.bucket.width);
+    gameElements.bucket.style.left = gameState.bucket.x + 'px';
 });
