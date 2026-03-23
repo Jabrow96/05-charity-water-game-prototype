@@ -47,6 +47,12 @@ const gameElements = {
 
 let speedPopupTimeoutId = null;
 
+function syncBucketSizeFromCSS() {
+    const bucketRect = gameElements.bucket.getBoundingClientRect();
+    gameState.bucket.width = Math.round(bucketRect.width);
+    gameState.bucket.height = Math.round(bucketRect.height);
+}
+
 // ============ SCREEN MANAGEMENT ============
 
 function switchScreen(screenName) {
@@ -280,42 +286,6 @@ function gameLoop() {
                 gameState.streak++;
                 updateGameSpeed();
                 updateHUD();
-function updateGameSpeed() {
-    const newSpeedLevel = Math.floor(gameState.score / 25);
-
-    if (newSpeedLevel === gameState.speedLevel) {
-        return;
-    }
-
-    gameState.speedLevel = newSpeedLevel;
-    gameState.speedMultiplier = Math.pow(gameState.speedRampFactor, gameState.speedLevel);
-
-    if (gameState.speedLevel > 0) {
-        showSpeedPopup();
-    }
-
-    // Rebuild spawn loop so drops also spawn faster as speed levels increase.
-    const nextSpawnInterval = Math.max(
-        gameState.minSpawnInterval,
-        Math.round(gameState.baseSpawnInterval / gameState.speedMultiplier)
-    );
-
-    clearInterval(gameState.dropSpawnId);
-    gameState.dropSpawnId = setInterval(spawnGameDrops, nextSpawnInterval);
-}
-
-function showSpeedPopup() {
-    if (!gameElements.speedPopup) return;
-
-    gameElements.speedPopup.textContent = 'Very Good! The drops get faster!';
-    gameElements.speedPopup.classList.add('show');
-
-    clearTimeout(speedPopupTimeoutId);
-    speedPopupTimeoutId = setTimeout(() => {
-        gameElements.speedPopup.classList.remove('show');
-    }, 1500);
-}
-
                 // Check if streak hits milestone for healing
                 if (gameState.streak > 0 && gameState.streak % 10 === 0) {
                     gameState.lives = Math.min(gameState.lives + 1, gameState.maxLives);
@@ -358,6 +328,42 @@ function showSpeedPopup() {
             gameState.drops.splice(i, 1);
         }
     }
+}
+
+function updateGameSpeed() {
+    const newSpeedLevel = Math.floor(gameState.score / 25);
+
+    if (newSpeedLevel === gameState.speedLevel) {
+        return;
+    }
+
+    gameState.speedLevel = newSpeedLevel;
+    gameState.speedMultiplier = Math.pow(gameState.speedRampFactor, gameState.speedLevel);
+
+    if (gameState.speedLevel > 0) {
+        showSpeedPopup();
+    }
+
+    // Rebuild spawn loop so drops also spawn faster as speed levels increase.
+    const nextSpawnInterval = Math.max(
+        gameState.minSpawnInterval,
+        Math.round(gameState.baseSpawnInterval / gameState.speedMultiplier)
+    );
+
+    clearInterval(gameState.dropSpawnId);
+    gameState.dropSpawnId = setInterval(spawnGameDrops, nextSpawnInterval);
+}
+
+function showSpeedPopup() {
+    if (!gameElements.speedPopup) return;
+
+    gameElements.speedPopup.textContent = 'Very Good! The drops get faster!';
+    gameElements.speedPopup.classList.add('show');
+
+    clearTimeout(speedPopupTimeoutId);
+    speedPopupTimeoutId = setTimeout(() => {
+        gameElements.speedPopup.classList.remove('show');
+    }, 1500);
 }
 
 // ============ HUD UPDATE ============
@@ -416,6 +422,7 @@ function startCountdown() {
 
 function startGame() {
     switchScreen('game');
+    syncBucketSizeFromCSS();
 
     // Reset game state
     gameState.score = 0;
@@ -473,6 +480,7 @@ function spawnPreviewDropsLoop() {
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
     switchScreen('start');
+    syncBucketSizeFromCSS();
     gameElements.bucket.style.left = gameState.bucket.x + 'px';
     gameElements.bucket.style.top = gameState.bucket.y + 'px';
     spawnPreviewDropsLoop();
@@ -481,5 +489,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Handle window resize
 window.addEventListener('resize', () => {
+    syncBucketSizeFromCSS();
     updateBucketPositionXY(gameState.bucket.x, gameState.bucket.y);
 });
