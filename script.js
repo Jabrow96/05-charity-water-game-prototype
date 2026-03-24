@@ -37,6 +37,7 @@ const gameElements = {
     bucket: document.getElementById('bucket'),
     gameDrops: document.getElementById('gameDrops'),
     speedPopup: document.getElementById('speedPopup'),
+    resetBtn: document.getElementById('resetBtn'),
     dropCounter: document.getElementById('dropCounter'),
     streakText: document.getElementById('streakText'),
     heartSvg: document.getElementById('heartSvg'),
@@ -421,6 +422,10 @@ function startCountdown() {
 }
 
 function startGame() {
+    // Safety: reset any existing loops before starting a fresh run.
+    clearInterval(gameState.dropSpawnId);
+    clearInterval(gameState.gameLoopId);
+
     switchScreen('game');
     syncBucketSizeFromCSS();
 
@@ -458,13 +463,34 @@ function endGame() {
     switchScreen('end');
 }
 
+function returnToStartScreen() {
+    // Stop gameplay loops and clear active drops before showing start screen.
+    clearInterval(gameState.dropSpawnId);
+    clearInterval(gameState.gameLoopId);
+
+    gameState.drops = [];
+    gameElements.gameDrops.innerHTML = '';
+
+    if (gameElements.speedPopup) {
+        gameElements.speedPopup.classList.remove('show');
+    }
+
+    switchScreen('start');
+}
+
 // Retry Button
 document.getElementById('retryBtn').addEventListener('click', () => {
-    switchScreen('start');
-    gameElements.previewDrops.innerHTML = '';
-    // Start preview drops again
-    spawnPreviewDropsLoop();
+    returnToStartScreen();
 });
+
+// In-game Reset Button
+if (gameElements.resetBtn) {
+    gameElements.resetBtn.addEventListener('click', () => {
+        if (gameState.phase === 'game') {
+            returnToStartScreen();
+        }
+    });
+}
 
 // ============ INITIALIZATION ============
 
